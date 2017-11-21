@@ -2,7 +2,6 @@
 #include <string>
 #include <vector>
 
-#include "common/ByteBuffer.h"
 #include "common/FileUtil.h"
 #include "processor/Processor.h"
 
@@ -19,6 +18,9 @@ int main(int argc, char * argv[])
 		printUsage(arguments[0]);
 		std::exit(1);
 	}
+
+	auto disk = loadFile(arguments[1]);
+	std::cout << disk.size() << std::endl;
 
 	return 0;
 }
