@@ -1,0 +1,23 @@
+MMU opcodes:
+0x00: Map device from A to redbus
+0x80: Get mapped device into A
+
+0x01: Set redbus window offset from A
+0x81: Get window offset to A
+
+0x02: Enable redbus
+0x82: Disable redbus
+
+0x03: Set external memory window to A
+0x83: Set a to memory mapped window
+
+0x04: Enable EMMW
+0x84: Disable it
+
+0x05: Set BRK to A
+0x85: Get BRK to A
+
+0x06: Set POR to A
+0x86: Get POR to A
+
+0xFF: Log register A

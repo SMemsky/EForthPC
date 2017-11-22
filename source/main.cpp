@@ -19,8 +19,10 @@ int main(int argc, char * argv[])
 		std::exit(1);
 	}
 
-	auto disk = loadFile(arguments[1]);
-	std::cout << disk.size() << std::endl;
+	Processor processor(8);
+
+	// auto disk = loadFile(arguments[1]);
+	// std::cout << disk.size() << std::endl;
 
 	return 0;
 }
