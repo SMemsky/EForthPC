@@ -129,7 +129,7 @@ bool Processor::getFlag(Flag flag)
 
 uint8_t Processor::readOnlyMemory(uint16_t address)
 {
-	if ((address >> 13) + 1 > memoryBanks) {
+	if ((address >> 13) + 1u > memoryBanks) {
 		return 255;
 	}
 
@@ -178,7 +178,7 @@ uint16_t Processor::readW(uint16_t address)
 
 uint16_t Processor::readBXW()
 {
-	uint16_t i = readMemory(regs.PC++) + regs.X & 0xff;
+	uint16_t i = (readMemory(regs.PC++) + regs.X) & 0xff;
 	uint16_t j = readMemory(i);
 	j |= readMemory(i + 1) << 8;
 	return j;
