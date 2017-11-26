@@ -3,6 +3,8 @@
 #include <vector>
 
 #include "common/FileUtil.h"
+#include "processor/Floppy.h"
+#include "processor/FloppyDrive.h"
 #include "processor/Processor.h"
 
 void printUsage(std::string const & program)
@@ -19,12 +21,22 @@ int main(int argc, char * argv[])
 		std::exit(1);
 	}
 
-	Processor processor(8);
-	processor.warmBoot();
-	processor.runTick();
+	Floppy disk(arguments[1], loadFile(arguments[1]));
 
-	// auto disk = loadFile(arguments[1]);
-	// std::cout << disk.size() << std::endl;
+	FloppyDrive drive(2);
+	drive.setDisk(disk);
+
+	drive.write(0x82, 0x1);
+
+	std::cout << +drive.read(0x82) << std::endl;
+	for (unsigned i = 0; i < 128; ++i) {
+		std::cout << +drive.read(i) << " ";
+	}
+	std::cout << std::endl;
+
+	// Processor processor(8);
+	// processor.warmBoot();
+	// processor.runTick();
 
 	return 0;
 }

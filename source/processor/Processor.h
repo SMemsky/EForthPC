@@ -3,7 +3,9 @@
 #include <array>
 #include <cstdint>
 
-class Processor
+#include "RedbusConnectable.h"
+
+class Processor : public RedbusConnectable
 {
 public:
 	Processor(unsigned memoryBanks = 1);
@@ -13,6 +15,9 @@ public:
 	void halt();
 
 	void runTick();
+
+	uint8_t read(uint8_t address) override;
+	void write(uint8_t address, uint8_t value) override;
 private:
 	enum Flag {
 		Carry		= 1 << 0,
@@ -34,9 +39,12 @@ private:
 
 	uint8_t readOnlyMemory(uint16_t address);
 	uint8_t readMemory(uint16_t address);
+	void writeOnlyMemory(uint16_t address, uint8_t value);
+	void writeMemory(uint16_t address, uint8_t value);
 	uint8_t readByte();
 	uint16_t readM();
 	uint16_t readM(uint16_t address);
+	void writeM(uint16_t address, uint16_t value);
 	uint16_t readBS();
 	uint16_t readW(uint16_t address);
 	uint16_t readBXW();
@@ -79,7 +87,8 @@ private:
 		uint8_t RBB;
 		uint8_t RBW;
 		uint8_t ERB;
-		bool enable;
+		bool enabled;
+		bool enableExternalWindow;
 	} mmu;
 
 	uint16_t flags;
@@ -89,4 +98,5 @@ private:
 
 	unsigned remainingCycles;
 	bool isRunning;
+	bool rbTimeout;
 };

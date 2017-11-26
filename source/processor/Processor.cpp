@@ -11,15 +11,17 @@ unsigned const Processor::bootImageSize = 256;
 unsigned const Processor::cyclesPerTick = 1000;
 
 Processor::Processor(unsigned memoryBanks) :
+	RedbusConnectable(0),
 	memory(),
 	memoryBanks(memoryBanks),
 	regs{0, 0, 0, 0, 0, 0, 0, 0, 0},
-	mmu{0, 0, 0, 0, false},
+	mmu{0, 0, 0, 0, false, false},
 	flags(0),
 	brkAddress(8192),
 	porAddress(8192),
 	remainingCycles(0),
-	isRunning(false)
+	isRunning(false),
+	rbTimeout(false)
 {
 	assert(this->memoryBanks != 0);
 	assert(this->memoryBanks <= maxBankCount);
@@ -86,6 +88,24 @@ void Processor::runTick()
 	}
 }
 
+uint8_t Processor::read(uint8_t address)
+{
+	if (!mmu.enableExternalWindow) {
+		return 0;
+	}
+
+	return readOnlyMemory(mmu.RBW + address);
+}
+
+void Processor::write(uint8_t address, uint8_t value)
+{
+	if (!mmu.enableExternalWindow) {
+		return;
+	}
+
+	writeOnlyMemory(mmu.RBW + address, value);
+}
+
 void Processor::setFlags(uint8_t mask)
 {
 	bool flagM = getFlag(FlagM);
@@ -141,6 +161,28 @@ uint8_t Processor::readMemory(uint16_t address)
 	return readOnlyMemory(address);
 }
 
+void Processor::writeOnlyMemory(uint16_t address, uint8_t value)
+{
+	if ((address >> 13) + 1u > memoryBanks) {
+		return;
+	}
+
+	memory[address] = value;
+}
+
+void Processor::writeMemory(uint16_t address, uint8_t value)
+{
+	if (mmu.enabled
+		&& (address >= mmu.RBB
+			&& address < (mmu.RBB + 256)))
+	{
+		std::cout << "Writing " << +value << " to RedBus at " << address << std::endl;
+		assert(false);
+	}
+
+	writeOnlyMemory(address, value);
+}
+
 uint8_t Processor::readByte()
 {
 	return readMemory(regs.PC++);
@@ -162,6 +204,14 @@ uint16_t Processor::readM(uint16_t address)
 		i |= readMemory(address+1) << 8;
 	}
 	return i;
+}
+
+void Processor::writeM(uint16_t address, uint16_t value)
+{
+	writeMemory(address, value & 0xff);
+	if (!getFlag(FlagM)) {
+		writeMemory(address + 1, value >> 8);
+	}
 }
 
 uint16_t Processor::readBS()
@@ -222,8 +272,16 @@ void Processor::processMMU(uint8_t opcode)
 		std::cout << "Redbus window set to " << +mmu.RBB << std::endl;
 		break;
 	case 0x02:
-		mmu.enable = true;
+		mmu.enabled = true;
 		std::cout << "Redbus enabled" << std::endl;
+		break;
+	case 0x04:
+		mmu.enableExternalWindow = true;
+		std::cout << "Redbus external window enabled" << std::endl;
+		break;
+	case 0x84:
+		mmu.enableExternalWindow = false;
+		std::cout << "Redbus external window disabled" << std::endl;
 		break;
 	default:
 		std::cout << "Unknown MMU opcode: " << std::hex << +opcode << std::dec << std::endl;
@@ -249,9 +307,11 @@ void Processor::processInstruction()
 		i_or(readM(readBS()));
 		break;
 	case 0x18:
-		clearFlag(Carry); break;
-	// case 0x64:
-	// 	break;
+		clearFlag(Carry);
+		break;
+	case 0x64:
+		writeM(readByte(), 0);
+		break;
 	case 0xa5:
 		regs.A = readM(readByte());
 		updateNZ();
