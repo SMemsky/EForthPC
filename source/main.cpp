@@ -20,6 +20,8 @@ int main(int argc, char * argv[])
 	}
 
 	Processor processor(8);
+	processor.warmBoot();
+	processor.runTick();
 
 	// auto disk = loadFile(arguments[1]);
 	// std::cout << disk.size() << std::endl;
