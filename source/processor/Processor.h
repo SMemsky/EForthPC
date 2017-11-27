@@ -34,6 +34,7 @@ private:
 
 	void setFlags(uint8_t mask);
 	void resetFlags(uint8_t mask);
+	void setFlag(Flag flag, bool value);
 	void setFlag(Flag flag);
 	void clearFlag(Flag flag);
 	bool getFlag(Flag flag);
@@ -57,6 +58,7 @@ private:
 	uint16_t readBS();
 	uint16_t readBR();
 	uint16_t readBSWY();
+	uint16_t readBRWY();
 	uint16_t readW();
 	uint16_t readW(uint16_t address);
 	uint16_t readWX();
@@ -89,6 +91,7 @@ private:
 	uint16_t popMr();
 	uint16_t popXr();
 
+	void i_adc(uint16_t value);
 	void i_brc(bool condition);
 	void i_cmp(uint16_t x, uint16_t y);
 	void i_inc(uint16_t address);

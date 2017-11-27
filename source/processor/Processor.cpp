@@ -149,6 +149,15 @@ void Processor::resetFlags(uint8_t mask)
 	setFlags(baseFlags);
 }
 
+void Processor::setFlag(Flag flag, bool value)
+{
+	if (value) {
+		setFlag(flag);
+	} else {
+		clearFlag(flag);
+	}
+}
+
 void Processor::setFlag(Flag flag)
 {
 	flags |= flag;
@@ -314,6 +323,12 @@ uint16_t Processor::readBR()
 }
 
 uint16_t Processor::readBSWY()
+{
+	uint16_t i = readByte() + regs.SP;
+	return readW(i) + regs.Y;
+}
+
+uint16_t Processor::readBRWY()
 {
 	uint16_t i = readByte() + regs.R;
 	return readW(i) + regs.Y;
@@ -538,6 +553,27 @@ uint16_t Processor::popXr()
 	return pop2r();
 }
 
+void Processor::i_adc(uint16_t value)
+{
+	if (getFlag(FlagM)) {
+		if (getFlag(Decimal)) {
+			// TODO
+			assert(false && "Not implemented");
+		} else {
+			// TODO
+			assert(false && "Not implemented");
+		}
+	} else {
+		uint16_t v = regs.A + value + (getFlag(Carry) ? 1 : 0);
+		setFlag(Carry, v > 255);
+		setFlag(Overflow, (v ^ regs.A) & (v ^ value) & 0x80);
+
+		regs.A = v & 0xff;
+	}
+
+	updateNZ();
+}
+
 void Processor::i_brc(bool condition)
 {
 	int8_t i = readByte();
@@ -637,7 +673,7 @@ void Processor::processMMU(uint8_t opcode)
 void Processor::processInstruction()
 {
 	uint8_t opcode = readMemory(regs.PC++);
-	std::cout << std::hex << "Got opcode: " << +opcode << std::dec << " (" << +opcode << ")" << std::endl;
+	// std::cout << std::hex << "Got opcode: " << +opcode << std::dec << " (" << +opcode << ")" << std::endl;
 
 	switch (opcode) {
 	case 0x01:
@@ -684,27 +720,43 @@ void Processor::processInstruction()
 	case 0x5c:
 		regs.I = regs.X;
 		updateNZX(regs.X); break;
+	case 0x61: i_adc(readM(readBXW())); break;
+	case 0x63: i_adc(readM(readBS())); break;
 	case 0x64:
 		writeM(readByte(), 0); break;
+	case 0x65: i_adc(readM(readByte())); break;
+	case 0x67: i_adc(readM(readBR())); break;
 	case 0x68:
 		regs.A = popM();
 		updateNZ(); break;
 	case 0x6b:
 		regs.A = popMr();
 		updateNZ(regs.A); break;
-	case 0x85:
-		writeM(readByte(), regs.A); break;
+	case 0x6d: i_adc(readM(readW())); break;
+	case 0x71: i_adc(readM(readBWY())); break;
+	case 0x72: i_adc(readM(readBW())); break;
+	case 0x73: i_adc(readM(readBSWY())); break;
+	case 0x75: i_adc(readM(readBX())); break;
+	case 0x77: i_adc(readM(readBRWY())); break;
+	case 0x79: i_adc(readM(readWY())); break;
+	case 0x7d: i_adc(readM(readWX())); break;
+	case 0x81: writeM(readBXW(), regs.A); break;
+	case 0x83: writeM(readBS(), regs.A); break;
+	case 0x85: writeM(readByte(), regs.A); break;
+	case 0x87: writeM(readBR(), regs.A); break;
 	case 0x88:
 		regs.Y = (regs.Y - 1) & (getFlag(FlagX) ? 255 : 65535);
 		updateNZ(regs.Y); break;
-	case 0x8d:
-		writeM(readW(), regs.A); break;
+	case 0x8d: writeM(readW(), regs.A); break;
 	case 0x8f:
 		regs.D = regs.B = 0; break;
-	case 0x92:
-		writeM(readBW(), regs.A); break;
-	case 0x95:
-		writeM(readBX(), regs.A); break;
+	case 0x91: writeM(readBWY(), regs.A); break;
+	case 0x92: writeM(readBW(), regs.A); break;
+	case 0x93: writeM(readBSWY(), regs.A); break;
+	case 0x95: writeM(readBX(), regs.A); break;
+	case 0x97: writeM(readBRWY(), regs.A); break;
+	case 0x99: writeM(readWY(), regs.A); break;
+	case 0x9d: writeM(readWX(), regs.A); break;
 	case 0xa0:
 		regs.Y = readX();
 		updateNZ(regs.Y); break;

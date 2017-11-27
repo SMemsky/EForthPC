@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "common/FileUtil.h"
+#include "processor/Console.h"
 #include "processor/Floppy.h"
 #include "processor/FloppyDrive.h"
 #include "processor/Processor.h"
@@ -24,16 +25,19 @@ int main(int argc, char * argv[])
 
 	RedbusNetwork net;
 
-	Floppy disk(arguments[1], loadFile(arguments[1]));
+	Console console(net, 1);
 
+	Floppy disk(arguments[1], loadFile(arguments[1]));
 	FloppyDrive drive(net, 2);
 	drive.setDisk(disk);
 
 	Processor processor(net, 8, 0);
 	processor.warmBoot();
-	for (unsigned i = 0; i < 57; ++i) {
+	for (unsigned i = 0; i < 60; ++i) {
 		processor.runTick();
 	}
+
+	console.debugPrint();
 
 	return 0;
 }
