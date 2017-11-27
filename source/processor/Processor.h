@@ -95,6 +95,8 @@ private:
 	void i_sbc(uint16_t value);
 	void i_div(uint16_t value);
 	void i_brc(bool condition);
+	void i_trb(uint16_t value);
+	void i_tsb(uint16_t value);
 	void i_cmp(uint16_t x, uint16_t y);
 	void i_inc(uint16_t address);
 	void i_eor(uint16_t value);

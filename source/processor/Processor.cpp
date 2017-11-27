@@ -635,6 +635,18 @@ void Processor::i_brc(bool condition)
 	}
 }
 
+void Processor::i_trb(uint16_t value)
+{
+	setFlag(Zero, value & regs.A);
+	regs.A &= value ^ 0xffff;
+}
+
+void Processor::i_tsb(uint16_t value)
+{
+	setFlag(Zero, value & regs.A);
+	regs.A |= value;
+}
+
 void Processor::i_cmp(uint16_t x, uint16_t y)
 {
 	if (x >= y) {
@@ -737,13 +749,16 @@ void Processor::processInstruction()
 		regs.PC = readW(regs.I);
 		regs.I += 2; break;
 	case 0x03: i_or(readM(readBS())); break;
+	case 0x04: i_tsb(readM(readByte())); break;
 	case 0x05: i_or(readM(readByte())); break;
 	case 0x07: i_or(readM(readBR())); break;
 	case 0x09: i_or(readM()); break;
+	case 0x0c: i_tsb(readM(readW())); break;
 	case 0x0d: i_or(readM(readW())); break;
 	case 0x11: i_or(readM(readBWY())); break;
 	case 0x12: i_or(readM(readBW())); break;
 	case 0x13: i_or(readM(readBSWY())); break;
+	case 0x14: i_trb(readM(readByte())); break;
 	case 0x15: i_or(readM(readBX())); break;
 	case 0x17: i_or(readM(readBRWY())); break;
 	case 0x18:
@@ -752,6 +767,7 @@ void Processor::processInstruction()
 	case 0x1a:
 		regs.A = (regs.A + 1) & (getFlag(FlagM) ? 255 : 65535);
 		updateNZ(regs.A); break;
+	case 0x1c: i_trb(readM(readW())); break;
 	case 0x1d: i_or(readM(readWX())); break;
 	case 0x22:
 		push2r(regs.I);
