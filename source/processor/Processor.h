@@ -42,20 +42,52 @@ private:
 	uint8_t readMemory(uint16_t address);
 	void writeOnlyMemory(uint16_t address, uint8_t value);
 	void writeMemory(uint16_t address, uint8_t value);
+
 	uint8_t readByte();
 	uint16_t readM();
 	uint16_t readX();
 	uint16_t readM(uint16_t address);
+	uint16_t readX(uint16_t address);
+
 	void writeM(uint16_t address, uint16_t value);
+	void writeX(uint16_t address, uint16_t value);
+
+	uint16_t readBX();
+	uint16_t readBY();
 	uint16_t readBS();
+	uint16_t readBR();
+	uint16_t readBSWY();
 	uint16_t readW();
 	uint16_t readW(uint16_t address);
+	uint16_t readWX();
+	uint16_t readWY();
+	uint16_t readWXW();
 	uint16_t readBW();
+	uint16_t readWW();
 	uint16_t readBXW();
+	uint16_t readBWY();
 
 	void updateNZ();
 	void updateNZ(uint16_t value);
 	void updateNZX(uint16_t value);
+
+	void push1(uint8_t value);
+	void push1r(uint8_t value);
+	void push2(uint16_t value);
+	void push2r(uint16_t value);
+	void pushM(uint16_t value);
+	void pushX(uint16_t value);
+	void pushMr(uint16_t value);
+	void pushXr(uint16_t value);
+
+	uint8_t pop1();
+	uint8_t pop1r();
+	uint16_t pop2();
+	uint16_t pop2r();
+	uint16_t popM();
+	uint16_t popX();
+	uint16_t popMr();
+	uint16_t popXr();
 
 	void i_brc(bool condition);
 	void i_cmp(uint16_t x, uint16_t y);
@@ -96,7 +128,7 @@ private:
 		uint16_t redbusWindow;
 		uint16_t externalWindow;
 		bool redbusEnabled;
-		bool enableExternalWindow;
+		bool externalWindowEnabled;
 	} mmu;
 
 	uint16_t flags;

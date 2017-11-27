@@ -101,7 +101,7 @@ void Processor::runTick()
 
 uint8_t Processor::read(uint8_t address)
 {
-	if (!mmu.enableExternalWindow) {
+	if (!mmu.externalWindowEnabled) {
 		return 0;
 	}
 
@@ -110,7 +110,7 @@ uint8_t Processor::read(uint8_t address)
 
 void Processor::write(uint8_t address, uint8_t value)
 {
-	if (!mmu.enableExternalWindow) {
+	if (!mmu.externalWindowEnabled) {
 		return;
 	}
 
@@ -184,6 +184,7 @@ uint8_t Processor::readMemory(uint16_t address)
 			rbCache = RedbusDevice::findDevice(mmu.redbusAddress);
 		}
 		if (rbCache == nullptr) {
+			std::cout << "Device " << +mmu.redbusAddress << " is not found on Redbus!" << std::endl;
 			rbTimeout = true;
 			return 0;
 		}
@@ -216,6 +217,7 @@ void Processor::writeMemory(uint16_t address, uint8_t value)
 			rbCache = RedbusDevice::findDevice(mmu.redbusAddress);
 		}
 		if (rbCache == nullptr) {
+			std::cout << "Device " << +mmu.redbusAddress << " is not found on Redbus!" << std::endl;
 			rbTimeout = true;
 			return;
 		}
@@ -233,18 +235,18 @@ uint8_t Processor::readByte()
 
 uint16_t Processor::readM()
 {
-	uint16_t i = readMemory(regs.PC++);
+	uint16_t i = readByte();
 	if (!getFlag(FlagM)) {
-		i |= readMemory(regs.PC++) << 8;
+		i |= readByte() << 8;
 	}
 	return i;
 }
 
 uint16_t Processor::readX()
 {
-	uint16_t i = readMemory(regs.PC++);
+	uint16_t i = readByte();
 	if (!getFlag(FlagX)) {
-		i |= readMemory(regs.PC++) << 8;
+		i |= readByte() << 8;
 	}
 	return i;
 }
@@ -258,6 +260,15 @@ uint16_t Processor::readM(uint16_t address)
 	return i;
 }
 
+uint16_t Processor::readX(uint16_t address)
+{
+	uint16_t i = readMemory(address);
+	if (!getFlag(FlagX)) {
+		i |= readMemory(address + 1) << 8;
+	}
+	return i;
+}
+
 void Processor::writeM(uint16_t address, uint16_t value)
 {
 	writeMemory(address, value & 0xff);
@@ -266,15 +277,52 @@ void Processor::writeM(uint16_t address, uint16_t value)
 	}
 }
 
+void Processor::writeX(uint16_t address, uint16_t value)
+{
+	writeMemory(address, value & 0xff);
+	if (!getFlag(FlagX)) {
+		writeMemory(address + 1, value >> 8);
+	}
+}
+
+uint16_t Processor::readBX()
+{
+	uint16_t i = readByte() + regs.X;
+	if (getFlag(FlagX)) {
+		i &= 0xff;
+	}
+	return i;
+}
+
+uint16_t Processor::readBY()
+{
+	uint16_t i = readByte() + regs.Y;
+	if (getFlag(FlagX)) {
+		i &= 0xff;
+	}
+	return i;
+}
+
 uint16_t Processor::readBS()
 {
-	return readMemory(regs.PC++) + regs.SP;
+	return readByte() + regs.SP;
+}
+
+uint16_t Processor::readBR()
+{
+	return readByte() + regs.R;
+}
+
+uint16_t Processor::readBSWY()
+{
+	uint16_t i = readByte() + regs.R;
+	return readW(i) + regs.Y;
 }
 
 uint16_t Processor::readW()
 {
-	uint16_t i = readMemory(regs.PC++);
-	i |= readMemory(regs.PC++) << 8;
+	uint16_t i = readByte();
+	i |= readByte() << 8;
 	return i;
 }
 
@@ -285,15 +333,43 @@ uint16_t Processor::readW(uint16_t address)
 	return i;
 }
 
+uint16_t Processor::readWX()
+{
+	uint16_t i = readByte();
+	i |= readByte() << 8;
+	return i + regs.X;
+}
+
+uint16_t Processor::readWY()
+{
+	uint16_t i = readByte();
+	i |= readByte() << 8;
+	return i + regs.Y;
+}
+
+uint16_t Processor::readWXW()
+{
+	return readW(readWX());
+}
+
 uint16_t Processor::readBW()
 {
-	return readW(readMemory(regs.PC++));
+	return readW(readByte());
+}
+
+uint16_t Processor::readWW()
+{
+	return readW(readW());
 }
 
 uint16_t Processor::readBXW()
 {
-	uint16_t i = (readMemory(regs.PC++) + regs.X) & 0xff;
-	return readW(i);
+	return readW(readBX());
+}
+
+uint16_t Processor::readBWY()
+{
+	return readW(readByte()) + regs.Y;
 }
 
 void Processor::updateNZ()
@@ -329,6 +405,137 @@ void Processor::updateNZX(uint16_t value)
 	} else {
 		clearFlag(Zero);
 	}
+}
+
+void Processor::push1(uint8_t value)
+{
+	if (getFlag(FlagE)) {
+		regs.SP = ((regs.SP - 1) & 0xff) | (regs.SP & 0xff00);
+	} else {
+		--regs.SP;
+	}
+
+	writeMemory(regs.SP, value);
+}
+
+void Processor::push1r(uint8_t value)
+{
+	writeMemory(--regs.R, value);
+}
+
+void Processor::push2(uint16_t value)
+{
+	push1(value >> 8);
+	push1(value);
+}
+
+void Processor::push2r(uint16_t value)
+{
+	push1r(value >> 8);
+	push1r(value);
+}
+
+void Processor::pushM(uint16_t value)
+{
+	if (getFlag(FlagM)) {
+		push1(value);
+	} else {
+		push2(value);
+	}
+}
+
+void Processor::pushX(uint16_t value)
+{
+	if (getFlag(FlagX)) {
+		push1(value);
+	} else {
+		push2(value);
+	}
+}
+
+void Processor::pushMr(uint16_t value)
+{
+	if (getFlag(FlagM)) {
+		push1r(value);
+	} else {
+		push2r(value);
+	}
+}
+
+void Processor::pushXr(uint16_t value)
+{
+	if (getFlag(FlagX)) {
+		push1r(value);
+	} else {
+		push2r(value);
+	}
+}
+
+uint8_t Processor::pop1()
+{
+	uint8_t i = readMemory(regs.SP);
+	if (getFlag(FlagE)) {
+		regs.SP = ((regs.SP + 1) & 0xff) | (regs.SP & 0xff00);
+	} else {
+		++regs.SP;
+	}
+
+	return i;
+}
+
+uint8_t Processor::pop1r()
+{
+	return readMemory(regs.R++);
+}
+
+uint16_t Processor::pop2()
+{
+	uint16_t i = pop1();
+	i |= pop1() << 8;
+	return i;
+}
+
+uint16_t Processor::pop2r()
+{
+	uint16_t i = pop1r();
+	i |= pop1r() << 8;
+	return i;
+}
+
+uint16_t Processor::popM()
+{
+	if (getFlag(FlagM)) {
+		return pop1();
+	}
+
+	return pop2();	
+}
+
+uint16_t Processor::popX()
+{
+	if (getFlag(FlagX)) {
+		return pop1();
+	}
+
+	return pop2();
+}
+
+uint16_t Processor::popMr()
+{
+	if (getFlag(FlagM)) {
+		return pop1r();
+	}
+
+	return pop2r();
+}
+
+uint16_t Processor::popXr()
+{
+	if (getFlag(FlagX)) {
+		return pop1r();
+	}
+
+	return pop2r();
 }
 
 void Processor::i_brc(bool condition)
@@ -401,16 +608,23 @@ void Processor::processMMU(uint8_t opcode)
 		mmu.redbusEnabled = true;
 		std::cout << "Redbus enabled" << std::endl;
 		break;
+	case 0x03:
+		mmu.externalWindow = regs.A;
+		std::cout << "External redbus window set to " << +mmu.externalWindow << std::endl;
+		break;
 	case 0x04:
-		mmu.enableExternalWindow = true;
+		mmu.externalWindowEnabled = true;
 		std::cout << "Redbus external window enabled" << std::endl;
+		break;
+	case 0x06:
+		porAddress = regs.A;
 		break;
 	case 0x82:
 		mmu.redbusEnabled = false;
 		std::cout << "Redbus disabled" << std::endl;
 		break;
 	case 0x84:
-		mmu.enableExternalWindow = false;
+		mmu.externalWindowEnabled = false;
 		std::cout << "Redbus external window disabled" << std::endl;
 		break;
 	default:
@@ -430,12 +644,27 @@ void Processor::processInstruction()
 		i_or(readM(readBXW())); break;
 	case 0x02:
 		regs.PC = readW(regs.I);
-		regs.I += 2;
-		break;
+		regs.I += 2; break;
 	case 0x03:
 		i_or(readM(readBS())); break;
+	case 0x05:
+		i_or(readM(readByte())); break;
+	case 0x07:
+		i_or(readM(readBR())); break;
 	case 0x18:
 		clearFlag(Carry); break;
+	case 0x1a:
+		regs.X = (regs.X + 1) & (getFlag(FlagM) ? 255 : 65535);
+		updateNZ(regs.A); break;
+	case 0x22:
+		push2r(regs.I);
+		regs.I = regs.PC + 2;
+		regs.PC = readW(regs.PC); break;
+	case 0x2b:
+		regs.I = pop2r();
+		updateNZX(regs.I); break;
+	case 0x30:
+		i_brc(getFlag(Sign)); break;
 	case 0x38:
 		setFlag(Carry); break;
 	case 0x42:
@@ -446,6 +675,10 @@ void Processor::processInstruction()
 			regs.I += 2;
 		}
 		break;
+	case 0x48:
+		pushM(regs.A); break;
+	case 0x4b:
+		pushMr(regs.A); break;
 	case 0x4c:
 		regs.PC = readW(); std::cout << "GOTO " << regs.PC << std::endl; break;
 	case 0x5c:
@@ -453,6 +686,12 @@ void Processor::processInstruction()
 		updateNZX(regs.X); break;
 	case 0x64:
 		writeM(readByte(), 0); break;
+	case 0x68:
+		regs.A = popM();
+		updateNZ(); break;
+	case 0x6b:
+		regs.A = popMr();
+		updateNZ(regs.A); break;
 	case 0x85:
 		writeM(readByte(), regs.A); break;
 	case 0x88:
@@ -460,25 +699,46 @@ void Processor::processInstruction()
 		updateNZ(regs.Y); break;
 	case 0x8d:
 		writeM(readW(), regs.A); break;
+	case 0x8f:
+		regs.D = regs.B = 0; break;
 	case 0x92:
 		writeM(readBW(), regs.A); break;
+	case 0x95:
+		writeM(readBX(), regs.A); break;
 	case 0xa0:
 		regs.Y = readX();
 		updateNZ(regs.Y); break;
+	case 0xa1:
+		regs.A = readM(readBXW());
+		updateNZ(); break;
 	case 0xa2:
 		regs.X = readX();
 		updateNZ(regs.X); break;
+	case 0xa3:
+		regs.A = readM(readBS());
+		updateNZ(); break;
 	case 0xa5:
 		regs.A = readM(readByte());
 		updateNZ(); break;
 	case 0xa9:
 		regs.A = readM();
 		updateNZ(); break;
+	case 0xaa:
+		regs.X = regs.A;
+		if (getFlag(FlagX)) {
+			regs.X &= 0xff;
+		}
+		updateNZX(regs.X); break;
 	case 0xad:
 		regs.A = readM(readW());
 		updateNZ(); break;
+	case 0xb5:
+		regs.A = readM(readBX());
+		updateNZ(); break;
 	case 0xc2:
 		resetFlags(readByte()); break;
+	case 0xc3:
+		i_cmp(regs.A, readM(readBS())); break;
 	case 0xcb:
 		std::cout << "Processing WAI" << std::endl;
 		waiTimeout = true; break;
@@ -486,6 +746,14 @@ void Processor::processInstruction()
 		i_cmp(regs.A, readM(readW())); break;
 	case 0xd0:
 		i_brc(!getFlag(Zero)); break;
+	case 0xda:
+		pushX(regs.X); break;
+	case 0xdc:
+		regs.X = regs.I;
+		if (getFlag(FlagX)) {
+			regs.X &= 0xff;
+		}
+		updateNZX(regs.X); break;
 	case 0xe2:
 		setFlags(readByte()); break;
 	case 0xe6:
@@ -494,6 +762,11 @@ void Processor::processInstruction()
 		processMMU(readByte()); break;
 	case 0xf0:
 		i_brc(getFlag(Zero)); break;
+	case 0xf4:
+		push2(readW()); break;
+	case 0xfa:
+		regs.X = popX();
+		updateNZX(regs.X); break;
 	case 0xfb:
 		if (getFlag(FlagE) == getFlag(Carry)) {
 			break;
