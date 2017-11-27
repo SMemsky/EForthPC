@@ -33,7 +33,7 @@ int main(int argc, char * argv[])
 
 	Processor processor(net, 8, 0);
 	processor.warmBoot();
-	for (unsigned i = 0; i < 60; ++i) {
+	for (unsigned i = 0; i < 120; ++i) {
 		processor.runTick();
 	}
 
