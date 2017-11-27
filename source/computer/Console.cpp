@@ -23,10 +23,35 @@ Console::Console(RedbusNetwork & network, uint8_t address) :
 	screen.fill(32);
 }
 
+void Console::draw(sf::RenderWindow & window)
+{
+	sf::Texture drawTexture;
+	if (!drawTexture.loadFromFile("resources/gui/displaygui.png")) {
+		return;
+	}
+	sf::Sprite drawSprite;
+	drawSprite.setTexture(drawTexture);
+	drawSprite.setTextureRect(sf::IntRect(0, 0, 350, 230));
+	drawSprite.setPosition(sf::Vector2f(0, 0));
+
+	window.draw(drawSprite);
+
+	for (unsigned y = 0; y < 50; ++y) {
+		for (unsigned x = 0; x < 80; ++x) {
+			uint8_t symbol = screen[y * screenWidth + x];
+			if (symbol != 32) {
+				drawSprite.setTextureRect(sf::IntRect(350 + (symbol & 15) * 8, (symbol >> 4) * 8, 8, 8));
+				drawSprite.setPosition(sf::Vector2f(x*4+15, y*4+15));
+				drawSprite.setScale(sf::Vector2f(0.5f, 0.5f));
+
+				window.draw(drawSprite);
+			}
+		}
+	}
+}
+
 uint8_t Console::read(uint8_t address)
 {
-	std::cout << "Read console: " << +address << std::endl;
-
 	if (address >= 16
 		&& address < 96)
 	{

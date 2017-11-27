@@ -47,8 +47,6 @@ void Processor::coldBoot()
 	setFlag(FlagM);
 	setFlag(FlagX);
 
-	std::cout << "Cold boot flags: " << flags << std::endl;
-
 	memory[0] = 2; // Disk
 	memory[1] = 1; // Console
 
@@ -191,7 +189,7 @@ uint8_t Processor::readMemory(uint16_t address)
 		&& (address >= mmu.redbusWindow
 			&& address < (mmu.redbusWindow + 256)))
 	{
-		std::cout << "Reading from RedBus at " << address << std::endl;
+		// std::cout << "Reading from RedBus at " << address << std::endl;
 		if (rbCache == nullptr) {
 			rbCache = RedbusDevice::findDevice(mmu.redbusAddress);
 		}
@@ -202,7 +200,7 @@ uint8_t Processor::readMemory(uint16_t address)
 		}
 
 		uint8_t tmp = rbCache->read(address - mmu.redbusWindow);
-		std::cout << "Readed: " << +tmp << std::endl;
+		// std::cout << "Readed: " << +tmp << std::endl;
 		return tmp;
 	}
 
@@ -224,7 +222,7 @@ void Processor::writeMemory(uint16_t address, uint8_t value)
 		&& (address >= mmu.redbusWindow
 			&& address < (mmu.redbusWindow + 256)))
 	{
-		std::cout << "Writing " << +value << " to RedBus at " << address << std::endl;
+		// std::cout << "Writing " << +value << " to RedBus at " << address << std::endl;
 		if (rbCache == nullptr) {
 			rbCache = RedbusDevice::findDevice(mmu.redbusAddress);
 		}
@@ -638,10 +636,10 @@ void Processor::i_brc(bool condition)
 {
 	int8_t i = readByte();
 	if (condition) {
-		std::cout << "Branch to " << +i << std::endl;
+		// std::cout << "Branch to " << +i << std::endl;
 		regs.PC += i;
 	} else {
-		std::cout << "No branch to " << +i << std::endl;
+		// std::cout << "No branch to " << +i << std::endl;
 	}
 }
 
@@ -701,7 +699,7 @@ void Processor::i_or(uint16_t value)
 
 void Processor::processMMU(uint8_t opcode)
 {
-	std::cout << std::hex << "Got MMU opcode: " << +opcode << std::dec << std::endl;
+	// std::cout << std::hex << "Got MMU opcode: " << +opcode << std::dec << std::endl;
 
 	switch (opcode) {
 	case 0x00:
@@ -712,34 +710,34 @@ void Processor::processMMU(uint8_t opcode)
 
 			mmu.redbusAddress = (regs.A & 0xff);
 		}
-		std::cout << "Redbus window mapped to device " << +mmu.redbusAddress << std::endl;
+		// std::cout << "Redbus window mapped to device " << +mmu.redbusAddress << std::endl;
 		break;
 	case 0x01:
 		mmu.redbusWindow = regs.A;
-		std::cout << "Redbus window set to " << +mmu.redbusWindow << std::endl;
+		// std::cout << "Redbus window set to " << +mmu.redbusWindow << std::endl;
 		break;
 	case 0x02:
 		mmu.redbusEnabled = true;
-		std::cout << "Redbus enabled" << std::endl;
+		// std::cout << "Redbus enabled" << std::endl;
 		break;
 	case 0x03:
 		mmu.externalWindow = regs.A;
-		std::cout << "External redbus window set to " << +mmu.externalWindow << std::endl;
+		// std::cout << "External redbus window set to " << +mmu.externalWindow << std::endl;
 		break;
 	case 0x04:
 		mmu.externalWindowEnabled = true;
-		std::cout << "Redbus external window enabled" << std::endl;
+		// std::cout << "Redbus external window enabled" << std::endl;
 		break;
 	case 0x06:
 		porAddress = regs.A;
 		break;
 	case 0x82:
 		mmu.redbusEnabled = false;
-		std::cout << "Redbus disabled" << std::endl;
+		// std::cout << "Redbus disabled" << std::endl;
 		break;
 	case 0x84:
 		mmu.externalWindowEnabled = false;
-		std::cout << "Redbus external window disabled" << std::endl;
+		// std::cout << "Redbus external window disabled" << std::endl;
 		break;
 	default:
 		std::cout << "Unknown MMU opcode: " << std::hex << +opcode << std::dec << std::endl;
@@ -751,7 +749,7 @@ void Processor::processMMU(uint8_t opcode)
 void Processor::processInstruction()
 {
 	uint8_t opcode = readMemory(regs.PC++);
-	std::cout << std::hex << (regs.PC - 1) << ": Got opcode: " << +opcode << std::dec << " (" << +opcode << ")" << std::endl;
+	// std::cout << std::hex << (regs.PC - 1) << ": Got opcode: " << +opcode << std::dec << " (" << +opcode << ")" << std::endl;
 
 	uint16_t n = 0;
 	switch (opcode) {
@@ -927,7 +925,6 @@ void Processor::processInstruction()
 	case 0xc2: resetFlags(readByte()); break;
 	case 0xc3: i_cmp(regs.A, readM(readBS())); break;
 	case 0xcb:
-		std::cout << "Processing WAI" << std::endl;
 		waiTimeout = true; break;
 	case 0xcd: i_cmp(regs.A, readM(readW())); break;
 	case 0xcf:

@@ -3,6 +3,8 @@
 #include <array>
 #include <cstdint>
 
+#include <SFML/Graphics.hpp>
+
 #include "RedbusDevice.h"
 #include "RedbusNetwork.h"
 
@@ -10,6 +12,8 @@ class Console : public RedbusDevice
 {
 public:
 	Console(RedbusNetwork & network, uint8_t address);
+
+	void draw(sf::RenderWindow & window);
 
 	uint8_t read(uint8_t address) override;
 	void write(uint8_t address, uint8_t value) override;
