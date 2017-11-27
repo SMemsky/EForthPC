@@ -6,6 +6,7 @@
 #include "processor/Floppy.h"
 #include "processor/FloppyDrive.h"
 #include "processor/Processor.h"
+#include "processor/RedbusNetwork.h"
 
 void printUsage(std::string const & program)
 {
@@ -21,14 +22,18 @@ int main(int argc, char * argv[])
 		std::exit(1);
 	}
 
+	RedbusNetwork net;
+
 	Floppy disk(arguments[1], loadFile(arguments[1]));
 
-	FloppyDrive drive(2);
+	FloppyDrive drive(net, 2);
 	drive.setDisk(disk);
 
-	Processor processor(8, 0);
+	Processor processor(net, 8, 0);
 	processor.warmBoot();
-	processor.runTick();
+	for (unsigned i = 0; i < 48; ++i) {
+		processor.runTick();
+	}
 
 	return 0;
 }

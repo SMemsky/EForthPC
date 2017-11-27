@@ -5,12 +5,13 @@
 #include <vector>
 
 #include "Floppy.h"
-#include "RedbusConnectable.h"
+#include "RedbusDevice.h"
+#include "RedbusNetwork.h"
 
-class FloppyDrive : public RedbusConnectable
+class FloppyDrive : public RedbusDevice
 {
 public:
-	FloppyDrive(uint8_t address);
+	FloppyDrive(RedbusNetwork & network, uint8_t address);
 
 	void setDisk(Floppy floppy);
 	Floppy const & getDisk() const;

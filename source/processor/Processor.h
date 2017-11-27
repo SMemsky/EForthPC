@@ -3,12 +3,13 @@
 #include <array>
 #include <cstdint>
 
-#include "RedbusConnectable.h"
+#include "RedbusDevice.h"
+#include "RedbusNetwork.h"
 
-class Processor : public RedbusConnectable
+class Processor : public RedbusDevice
 {
 public:
-	Processor(unsigned memoryBanks, uint8_t address);
+	Processor(RedbusNetwork & network, unsigned memoryBanks, uint8_t address);
 
 	void coldBoot();
 	void warmBoot();
@@ -24,15 +25,15 @@ private:
 		Zero		= 1 << 1,
 		Interrupt	= 1 << 2,
 		Decimal		= 1 << 3,
-		Breakpoint	= 1 << 4,
+		FlagX		= 1 << 4,
 		FlagM		= 1 << 5,
 		Overflow	= 1 << 6,
 		Sign		= 1 << 7,
-		FlagE		= 1 << 8,
-		FlagX		= 1 << 9
+		FlagE		= 1 << 8
 	};
 
 	void setFlags(uint8_t mask);
+	void resetFlags(uint8_t mask);
 	void setFlag(Flag flag);
 	void clearFlag(Flag flag);
 	bool getFlag(Flag flag);
@@ -43,14 +44,22 @@ private:
 	void writeMemory(uint16_t address, uint8_t value);
 	uint8_t readByte();
 	uint16_t readM();
+	uint16_t readX();
 	uint16_t readM(uint16_t address);
 	void writeM(uint16_t address, uint16_t value);
 	uint16_t readBS();
+	uint16_t readW();
 	uint16_t readW(uint16_t address);
+	uint16_t readBW();
 	uint16_t readBXW();
 
 	void updateNZ();
+	void updateNZ(uint16_t value);
+	void updateNZX(uint16_t value);
 
+	void i_brc(bool condition);
+	void i_cmp(uint16_t x, uint16_t y);
+	void i_inc(uint16_t address);
 	void i_or(uint16_t value);
 
 	void processMMU(uint8_t opcode);
@@ -73,8 +82,8 @@ private:
 	struct {
 		uint16_t A;
 		uint8_t B;
-		uint8_t X;
-		uint8_t Y;
+		uint16_t X;
+		uint16_t Y;
 		uint16_t D;
 		uint16_t SP;
 		uint16_t PC;
@@ -83,11 +92,10 @@ private:
 	} regs;
 
 	struct {
-		uint8_t RBA;
-		uint8_t RBB;
-		uint8_t RBW;
-		uint8_t ERB;
-		bool enabled;
+		uint8_t redbusAddress;
+		uint16_t redbusWindow;
+		uint16_t externalWindow;
+		bool redbusEnabled;
 		bool enableExternalWindow;
 	} mmu;
 
@@ -96,7 +104,11 @@ private:
 	uint16_t brkAddress;
 	uint16_t porAddress;
 
+	uint32_t ticks;
 	unsigned remainingCycles;
 	bool isRunning;
 	bool rbTimeout;
+	bool waiTimeout;
+
+	RedbusDevice * rbCache;
 };

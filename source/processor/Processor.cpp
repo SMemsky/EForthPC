@@ -10,18 +10,21 @@ unsigned const Processor::bootImageOffset = 1024;
 unsigned const Processor::bootImageSize = 256;
 unsigned const Processor::cyclesPerTick = 1000;
 
-Processor::Processor(unsigned memoryBanks, uint8_t address) :
-	RedbusConnectable(address),
+Processor::Processor(RedbusNetwork & network, unsigned memoryBanks, uint8_t address) :
+	RedbusDevice(network, address),
 	memory(),
 	memoryBanks(memoryBanks),
 	regs{0, 0, 0, 0, 0, 0, 0, 0, 0},
-	mmu{0, 0, 0, 0, false, false},
+	mmu{0, 0, 0, false, false},
 	flags(0),
 	brkAddress(8192),
 	porAddress(8192),
+	ticks(0),
 	remainingCycles(0),
 	isRunning(false),
-	rbTimeout(false)
+	rbTimeout(false),
+	waiTimeout(false),
+	rbCache(nullptr)
 {
 	assert(this->memoryBanks != 0);
 	assert(this->memoryBanks <= maxBankCount);
@@ -72,17 +75,25 @@ void Processor::halt()
 
 void Processor::runTick()
 {
+	++ticks;
+
 	if (!isRunning) {
 		return;
 	}
+
+	rbCache = nullptr;
+	rbTimeout = false;
+	waiTimeout = false;
 
 	remainingCycles += cyclesPerTick;
 	if (remainingCycles > 100 * cyclesPerTick) {
 		remainingCycles = 100 * cyclesPerTick;
 	}
 
-	while (isRunning &&
-		remainingCycles-- > 0)
+	while (isRunning
+		&& remainingCycles-- > 0
+		&& !waiTimeout
+		&& !rbTimeout)
 	{
 		processInstruction();
 	}
@@ -94,7 +105,7 @@ uint8_t Processor::read(uint8_t address)
 		return 0;
 	}
 
-	return readOnlyMemory(mmu.RBW + address);
+	return readOnlyMemory(mmu.externalWindow + address);
 }
 
 void Processor::write(uint8_t address, uint8_t value)
@@ -103,18 +114,16 @@ void Processor::write(uint8_t address, uint8_t value)
 		return;
 	}
 
-	writeOnlyMemory(mmu.RBW + address, value);
+	writeOnlyMemory(mmu.externalWindow + address, value);
 }
 
 void Processor::setFlags(uint8_t mask)
 {
 	bool flagM = getFlag(FlagM);
-	uint8_t baseFlags = flags & 0xff;
-	baseFlags &= ~mask;
-	flags = baseFlags | (flags & 0xff00);
+	flags = mask | (flags & 0xff00);
 
 	if (getFlag(FlagE)) {
-		clearFlag(Breakpoint);
+		clearFlag(FlagX);
 		clearFlag(FlagM);
 	} else {
 		if (getFlag(FlagX)) {
@@ -130,6 +139,14 @@ void Processor::setFlags(uint8_t mask)
 			}
 		}
 	}
+}
+
+void Processor::resetFlags(uint8_t mask)
+{
+	uint8_t baseFlags = flags & 0xff;
+	baseFlags &= ~mask;
+
+	setFlags(baseFlags);
 }
 
 void Processor::setFlag(Flag flag)
@@ -158,6 +175,24 @@ uint8_t Processor::readOnlyMemory(uint16_t address)
 
 uint8_t Processor::readMemory(uint16_t address)
 {
+	if (mmu.redbusEnabled
+		&& (address >= mmu.redbusWindow
+			&& address < (mmu.redbusWindow + 256)))
+	{
+		std::cout << "Reading from RedBus at " << address << std::endl;
+		if (rbCache == nullptr) {
+			rbCache = RedbusDevice::findDevice(mmu.redbusAddress);
+		}
+		if (rbCache == nullptr) {
+			rbTimeout = true;
+			return 0;
+		}
+
+		uint8_t tmp = rbCache->read(address - mmu.redbusWindow);
+		std::cout << "Readed: " << +tmp << std::endl;
+		return tmp;
+	}
+
 	return readOnlyMemory(address);
 }
 
@@ -172,12 +207,20 @@ void Processor::writeOnlyMemory(uint16_t address, uint8_t value)
 
 void Processor::writeMemory(uint16_t address, uint8_t value)
 {
-	if (mmu.enabled
-		&& (address >= mmu.RBB
-			&& address < (mmu.RBB + 256)))
+	if (mmu.redbusEnabled
+		&& (address >= mmu.redbusWindow
+			&& address < (mmu.redbusWindow + 256)))
 	{
 		std::cout << "Writing " << +value << " to RedBus at " << address << std::endl;
-		assert(false);
+		if (rbCache == nullptr) {
+			rbCache = RedbusDevice::findDevice(mmu.redbusAddress);
+		}
+		if (rbCache == nullptr) {
+			rbTimeout = true;
+			return;
+		}
+
+		rbCache->write(address - mmu.redbusWindow, value);
 	}
 
 	writeOnlyMemory(address, value);
@@ -197,11 +240,20 @@ uint16_t Processor::readM()
 	return i;
 }
 
+uint16_t Processor::readX()
+{
+	uint16_t i = readMemory(regs.PC++);
+	if (!getFlag(FlagX)) {
+		i |= readMemory(regs.PC++) << 8;
+	}
+	return i;
+}
+
 uint16_t Processor::readM(uint16_t address)
 {
 	uint16_t i = readMemory(address);
 	if (!getFlag(FlagM)) {
-		i |= readMemory(address+1) << 8;
+		i |= readMemory(address + 1) << 8;
 	}
 	return i;
 }
@@ -219,6 +271,13 @@ uint16_t Processor::readBS()
 	return readMemory(regs.PC++) + regs.SP;
 }
 
+uint16_t Processor::readW()
+{
+	uint16_t i = readMemory(regs.PC++);
+	i |= readMemory(regs.PC++) << 8;
+	return i;
+}
+
 uint16_t Processor::readW(uint16_t address)
 {
 	uint16_t i = readMemory(address);
@@ -226,27 +285,91 @@ uint16_t Processor::readW(uint16_t address)
 	return i;
 }
 
+uint16_t Processor::readBW()
+{
+	return readW(readMemory(regs.PC++));
+}
+
 uint16_t Processor::readBXW()
 {
 	uint16_t i = (readMemory(regs.PC++) + regs.X) & 0xff;
-	uint16_t j = readMemory(i);
-	j |= readMemory(i + 1) << 8;
-	return j;
+	return readW(i);
 }
 
 void Processor::updateNZ()
 {
-	if (regs.A & (getFlag(FlagM) ? 128 : 32768)) {
+	updateNZ(regs.A);
+}
+
+void Processor::updateNZ(uint16_t value)
+{
+	if (value & (getFlag(FlagM) ? 128 : 32768)) {
 		setFlag(Sign);
 	} else {
 		clearFlag(Sign);
 	}
 
-	if (regs.A == 0) {
+	if (value == 0) {
 		setFlag(Zero);
 	} else {
 		clearFlag(Zero);
 	}
+}
+
+void Processor::updateNZX(uint16_t value)
+{
+	if (value & (getFlag(FlagX) ? 128 : 32768)) {
+		setFlag(Sign);
+	} else {
+		clearFlag(Sign);
+	}
+
+	if (value == 0) {
+		setFlag(Zero);
+	} else {
+		clearFlag(Zero);
+	}
+}
+
+void Processor::i_brc(bool condition)
+{
+	int8_t i = readByte();
+	if (condition) {
+		std::cout << "Branch to " << +i << std::endl;
+		regs.PC += i;
+	} else {
+		std::cout << "No branch to " << +i << std::endl;
+	}
+}
+
+void Processor::i_cmp(uint16_t x, uint16_t y)
+{
+	if (x >= y) {
+		setFlag(Carry);
+	} else {
+		clearFlag(Carry);
+	}
+
+	if (x == y) {
+		setFlag(Zero);
+	} else {
+		clearFlag(Zero);
+	}
+
+	x -= y;
+	if (x & (getFlag(FlagM) ? 128 : 32768)) {
+		setFlag(Sign);
+	} else {
+		clearFlag(Sign);
+	}
+}
+
+void Processor::i_inc(uint16_t address)
+{
+	uint16_t i = readM(address);
+	i = (i + 1) & (getFlag(FlagM) ? 255 : 65535);
+	writeM(address, i);
+	updateNZ(i);
 }
 
 void Processor::i_or(uint16_t value)
@@ -261,23 +384,30 @@ void Processor::processMMU(uint8_t opcode)
 
 	switch (opcode) {
 	case 0x00:
-		if (mmu.RBA != (regs.A & 0xff)) {
-			// todo
-			mmu.RBA = (regs.A & 0xff);
+		if (mmu.redbusAddress != (regs.A & 0xff)) {
+			if (rbCache != nullptr) {
+				rbTimeout = true;
+			}
+
+			mmu.redbusAddress = (regs.A & 0xff);
 		}
-		std::cout << "Redbus window mapped to device " << +mmu.RBA << std::endl;
+		std::cout << "Redbus window mapped to device " << +mmu.redbusAddress << std::endl;
 		break;
 	case 0x01:
-		mmu.RBB = regs.A;
-		std::cout << "Redbus window set to " << +mmu.RBB << std::endl;
+		mmu.redbusWindow = regs.A;
+		std::cout << "Redbus window set to " << +mmu.redbusWindow << std::endl;
 		break;
 	case 0x02:
-		mmu.enabled = true;
+		mmu.redbusEnabled = true;
 		std::cout << "Redbus enabled" << std::endl;
 		break;
 	case 0x04:
 		mmu.enableExternalWindow = true;
 		std::cout << "Redbus external window enabled" << std::endl;
+		break;
+	case 0x82:
+		mmu.redbusEnabled = false;
+		std::cout << "Redbus disabled" << std::endl;
 		break;
 	case 0x84:
 		mmu.enableExternalWindow = false;
@@ -293,39 +423,77 @@ void Processor::processMMU(uint8_t opcode)
 void Processor::processInstruction()
 {
 	uint8_t opcode = readMemory(regs.PC++);
-	std::cout << std::hex << "Got opcode: " << +opcode << std::dec << std::endl;
+	std::cout << std::hex << "Got opcode: " << +opcode << std::dec << " (" << +opcode << ")" << std::endl;
 
 	switch (opcode) {
 	case 0x01:
-		i_or(readM(readBXW()));
-		break;
+		i_or(readM(readBXW())); break;
 	case 0x02:
 		regs.PC = readW(regs.I);
 		regs.I += 2;
 		break;
 	case 0x03:
-		i_or(readM(readBS()));
-		break;
+		i_or(readM(readBS())); break;
 	case 0x18:
-		clearFlag(Carry);
+		clearFlag(Carry); break;
+	case 0x38:
+		setFlag(Carry); break;
+	case 0x42:
+		if (getFlag(FlagM)) {
+			regs.A = readMemory(regs.I++);
+		} else {
+			regs.A = readW(regs.I);
+			regs.I += 2;
+		}
 		break;
+	case 0x4c:
+		regs.PC = readW(); std::cout << "GOTO " << regs.PC << std::endl; break;
+	case 0x5c:
+		regs.I = regs.X;
+		updateNZX(regs.X); break;
 	case 0x64:
-		writeM(readByte(), 0);
-		break;
+		writeM(readByte(), 0); break;
+	case 0x85:
+		writeM(readByte(), regs.A); break;
+	case 0x88:
+		regs.Y = (regs.Y - 1) & (getFlag(FlagX) ? 255 : 65535);
+		updateNZ(regs.Y); break;
+	case 0x8d:
+		writeM(readW(), regs.A); break;
+	case 0x92:
+		writeM(readBW(), regs.A); break;
+	case 0xa0:
+		regs.Y = readX();
+		updateNZ(regs.Y); break;
+	case 0xa2:
+		regs.X = readX();
+		updateNZ(regs.X); break;
 	case 0xa5:
 		regs.A = readM(readByte());
-		updateNZ();
-		break;
+		updateNZ(); break;
 	case 0xa9:
 		regs.A = readM();
-		updateNZ();
-		break;
+		updateNZ(); break;
+	case 0xad:
+		regs.A = readM(readW());
+		updateNZ(); break;
 	case 0xc2:
-		setFlags(readByte());
-		break;
+		resetFlags(readByte()); break;
+	case 0xcb:
+		std::cout << "Processing WAI" << std::endl;
+		waiTimeout = true; break;
+	case 0xcd:
+		i_cmp(regs.A, readM(readW())); break;
+	case 0xd0:
+		i_brc(!getFlag(Zero)); break;
+	case 0xe2:
+		setFlags(readByte()); break;
+	case 0xe6:
+		i_inc(readByte()); break;
 	case 0xef:
-		processMMU(readByte());
-		break;
+		processMMU(readByte()); break;
+	case 0xf0:
+		i_brc(getFlag(Zero)); break;
 	case 0xfb:
 		if (getFlag(FlagE) == getFlag(Carry)) {
 			break;

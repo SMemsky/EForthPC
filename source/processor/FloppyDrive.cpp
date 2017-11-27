@@ -1,7 +1,7 @@
 #include "FloppyDrive.h"
 
-FloppyDrive::FloppyDrive(uint8_t address) :
-	RedbusConnectable(address),
+FloppyDrive::FloppyDrive(RedbusNetwork & network, uint8_t address) :
+	RedbusDevice(network, address),
 	dataBuffer(),
 	disk(),
 	ejected(true),
