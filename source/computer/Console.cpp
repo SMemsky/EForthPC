@@ -29,12 +29,15 @@ void Console::draw(sf::RenderWindow & window, unsigned long ticks)
 	if (!drawTexture.loadFromFile("resources/gui/displaygui.png")) {
 		return;
 	}
+
 	sf::Sprite drawSprite;
 	drawSprite.setTexture(drawTexture);
 	drawSprite.setTextureRect(sf::IntRect(0, 0, 350, 230));
 	drawSprite.setPosition(sf::Vector2f(0, 0));
 
 	window.draw(drawSprite);
+
+	drawSprite.setColor(sf::Color(0, 255, 0));
 
 	for (unsigned y = 0; y < 50; ++y) {
 		for (unsigned x = 0; x < 80; ++x) {

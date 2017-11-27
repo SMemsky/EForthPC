@@ -93,6 +93,7 @@ private:
 
 	void i_adc(uint16_t value);
 	void i_sbc(uint16_t value);
+	void i_mul(uint16_t value);
 	void i_div(uint16_t value);
 	void i_and(uint16_t value);
 	void i_asl(uint16_t value);
