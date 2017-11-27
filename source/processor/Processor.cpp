@@ -732,22 +732,27 @@ void Processor::processInstruction()
 	std::cout << std::hex << (regs.PC - 1) << ": Got opcode: " << +opcode << std::dec << " (" << +opcode << ")" << std::endl;
 
 	switch (opcode) {
-	case 0x01:
-		i_or(readM(readBXW())); break;
+	case 0x01: i_or(readM(readBXW())); break;
 	case 0x02:
 		regs.PC = readW(regs.I);
 		regs.I += 2; break;
-	case 0x03:
-		i_or(readM(readBS())); break;
-	case 0x05:
-		i_or(readM(readByte())); break;
-	case 0x07:
-		i_or(readM(readBR())); break;
+	case 0x03: i_or(readM(readBS())); break;
+	case 0x05: i_or(readM(readByte())); break;
+	case 0x07: i_or(readM(readBR())); break;
+	case 0x09: i_or(readM()); break;
+	case 0x0d: i_or(readM(readW())); break;
+	case 0x11: i_or(readM(readBWY())); break;
+	case 0x12: i_or(readM(readBW())); break;
+	case 0x13: i_or(readM(readBSWY())); break;
+	case 0x15: i_or(readM(readBX())); break;
+	case 0x17: i_or(readM(readBRWY())); break;
 	case 0x18:
 		clearFlag(Carry); break;
+	case 0x19: i_or(readM(readWY())); break;
 	case 0x1a:
 		regs.A = (regs.A + 1) & (getFlag(FlagM) ? 255 : 65535);
 		updateNZ(regs.A); break;
+	case 0x1d: i_or(readM(readWX())); break;
 	case 0x22:
 		push2r(regs.I);
 		regs.I = regs.PC + 2;
