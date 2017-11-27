@@ -13,7 +13,8 @@ class Console : public RedbusDevice
 public:
 	Console(RedbusNetwork & network, uint8_t address);
 
-	void draw(sf::RenderWindow & window);
+	void draw(sf::RenderWindow & window, unsigned long ticks);
+	void pushKey(uint8_t key);
 
 	uint8_t read(uint8_t address) override;
 	void write(uint8_t address, uint8_t value) override;

@@ -23,7 +23,7 @@ Console::Console(RedbusNetwork & network, uint8_t address) :
 	screen.fill(32);
 }
 
-void Console::draw(sf::RenderWindow & window)
+void Console::draw(sf::RenderWindow & window, unsigned long ticks)
 {
 	sf::Texture drawTexture;
 	if (!drawTexture.loadFromFile("resources/gui/displaygui.png")) {
@@ -39,6 +39,21 @@ void Console::draw(sf::RenderWindow & window)
 	for (unsigned y = 0; y < 50; ++y) {
 		for (unsigned x = 0; x < 80; ++x) {
 			uint8_t symbol = screen[y * screenWidth + x];
+
+			if (x == cursorX && y == cursorY) {
+				if (cursorMode == 1) {
+					symbol ^= 128;
+				} else if (cursorMode == 2) {
+					if (ticks >> 2 & 0x1) {
+						symbol ^= 128;
+					}
+					if (ticks >> 6 & 0x1) {
+						pushKey('K');
+						pushKey('E');
+					}
+				}
+			}
+
 			if (symbol != 32) {
 				drawSprite.setTextureRect(sf::IntRect(350 + (symbol & 15) * 8, (symbol >> 4) * 8, 8, 8));
 				drawSprite.setPosition(sf::Vector2f(x*4+15, y*4+15));
@@ -47,6 +62,15 @@ void Console::draw(sf::RenderWindow & window)
 				window.draw(drawSprite);
 			}
 		}
+	}
+}
+
+void Console::pushKey(uint8_t key)
+{
+	uint8_t np = (kbPosition + 1) & 15;
+	if (np != kbStart) {
+		kbBuffer[kbPosition] = key;
+		kbPosition = np;
 	}
 }
 

@@ -47,6 +47,7 @@ int main(int argc, char * argv[])
 
 	unsigned long const usPerTick = 50 * 1000;
 	unsigned long tickTimer = 0;
+	unsigned long ticks = 0;
 
 	sf::Clock frameTimer;
 	frameTimer.restart();
@@ -67,12 +68,13 @@ int main(int argc, char * argv[])
 
 		while (tickTimer >= usPerTick) {
 			tickTimer -= usPerTick;
+			++ticks;
 
 			processor.runTick();
 		}
 
 		window.clear();
-		console.draw(window);
+		console.draw(window, ticks);
 		window.display();
 	}
 

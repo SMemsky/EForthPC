@@ -96,7 +96,6 @@ void Processor::runTick()
 		&& !rbTimeout)
 	{
 		processInstruction();
-		// std::this_thread::sleep_for(std::chrono::microseconds(100));
 	}
 }
 
@@ -941,9 +940,11 @@ void Processor::processInstruction()
 	case 0xe2: setFlags(readByte()); break;
 	case 0xe3: i_sbc(readM(readBS())); break;
 	case 0xe6: i_inc(readByte()); break;
+	case 0xee: i_inc(readW()); break;
 	case 0xef: processMMU(readByte()); break;
 	case 0xf0: i_brc(getFlag(Zero)); break;
 	case 0xf4: push2(readW()); break;
+	case 0xf6: i_inc(readBX()); break;
 	case 0xfa:
 		regs.X = popX();
 		updateNZX(regs.X); break;
@@ -969,6 +970,7 @@ void Processor::processInstruction()
 		}
 
 		break;
+	case 0xfe: i_inc(readWX()); break;
 	default:
 		std::cout << "Unknown opcode: " << std::hex << +opcode << " at " << regs.PC-1 << std::dec << std::endl;
 		isRunning = false;
