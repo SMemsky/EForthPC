@@ -598,9 +598,30 @@ void Processor::i_sbc(uint16_t value)
 	updateNZ();
 }
 
-void Processor::i_div(uint16_t)
+void Processor::i_div(uint16_t value)
 {
-	assert(false && "Not implemented");
+	if (value == 0) {
+		regs.A = regs.D = 0;
+		clearFlag(Overflow);
+		clearFlag(Zero);
+		clearFlag(Sign);
+		return;
+	}
+
+	if (getFlag(FlagM)) {
+		assert(false && "Not implemented");
+	} else if (getFlag(Carry)) {
+		assert(false && "Not implemented");
+	} else {
+		int64_t q = regs.D << 16 | regs.A;
+		regs.D = q % value & 0xffff;
+		q /= value;
+		regs.A = q;
+
+		setFlag(Overflow, q > 65535);
+		setFlag(Zero, regs.A == 0);
+		setFlag(Sign, q < 0);
+	}
 }
 
 void Processor::i_brc(bool condition)
@@ -767,6 +788,8 @@ void Processor::processInstruction()
 	case 0x55: i_eor(readM(readBX())); break;
 	case 0x57: i_eor(readM(readBRWY())); break;
 	case 0x59: i_eor(readM(readWY())); break;
+	case 0x5a:
+		pushX(regs.Y); break;
 	case 0x5c:
 		regs.I = regs.X;
 		updateNZX(regs.X); break;
@@ -792,6 +815,9 @@ void Processor::processInstruction()
 	case 0x75: i_adc(readM(readBX())); break;
 	case 0x77: i_adc(readM(readBRWY())); break;
 	case 0x79: i_adc(readM(readWY())); break;
+	case 0x7a:
+		regs.Y = popX();
+		updateNZX(regs.Y); break;
 	case 0x7d: i_adc(readM(readWX())); break;
 	case 0x81: writeM(readBXW(), regs.A); break;
 	case 0x83: writeM(readBS(), regs.A); break;
@@ -800,6 +826,13 @@ void Processor::processInstruction()
 	case 0x88:
 		regs.Y = (regs.Y - 1) & (getFlag(FlagX) ? 255 : 65535);
 		updateNZ(regs.Y); break;
+	case 0x8b:
+		if (getFlag(FlagX)) {
+			regs.SP = (regs.R & 0xff00) | (regs.X & 0xff);
+		} else {
+			regs.R = regs.X;
+		}
+		updateNZX(regs.R); break;
 	case 0x8d: writeM(readW(), regs.A); break;
 	case 0x8f:
 		regs.D = regs.B = 0; break;
@@ -867,6 +900,8 @@ void Processor::processInstruction()
 			regs.X &= 0xff;
 		}
 		updateNZX(regs.X); break;
+	case 0xdf:
+		pushM(regs.D); break;
 	case 0xe2:
 		setFlags(readByte()); break;
 	case 0xe3: i_sbc(readM(readBS())); break;
