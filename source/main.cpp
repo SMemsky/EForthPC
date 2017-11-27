@@ -55,9 +55,19 @@ int main(int argc, char * argv[])
 	while (window.isOpen()) {
 		sf::Event event;
 		while (window.pollEvent(event)) {
+			uint8_t code = 0;
 			switch (event.type) {
 			case sf::Event::Closed:
 				window.close(); break;
+			case sf::Event::TextEntered:
+				code = event.text.unicode;
+				if (code == 10) {
+					code = 13;
+				}
+				if (code > 0 && code <= 127) {
+					console.pushKey(code);
+				}
+				break;
 			default:
 				break;
 			}

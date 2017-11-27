@@ -621,6 +621,12 @@ void Processor::i_div(uint16_t value)
 	}
 }
 
+void Processor::i_and(uint16_t value)
+{
+	regs.A &= value;
+	updateNZ();
+}
+
 void Processor::i_asl(uint16_t value)
 {
 	uint16_t i = readM(value);
@@ -781,10 +787,15 @@ void Processor::processInstruction()
 	case 0x1c: i_trb(readM(readW())); break;
 	case 0x1d: i_or(readM(readWX())); break;
 	case 0x1e: i_asl(readWX()); break;
+	case 0x21: i_and(readM(readBXW())); break;
 	case 0x22:
 		push2r(regs.I);
 		regs.I = regs.PC + 2;
 		regs.PC = readW(regs.PC); break;
+	case 0x23: i_and(readM(readBS())); break;
+	case 0x25: i_and(readM(readByte())); break;
+	case 0x27: i_and(readM(readBR())); break;
+	case 0x29: i_and(readM()); break;
 	case 0x2a:
 		n = (regs.A << 1 | (getFlag(Carry) ? 1 : 0)) & (getFlag(FlagM) ? 255 : 65535);
 		setFlag(Carry, n & (getFlag(FlagM) ? 128 : 32768));
@@ -793,11 +804,19 @@ void Processor::processInstruction()
 	case 0x2b:
 		regs.I = pop2r();
 		updateNZX(regs.I); break;
+	case 0x2d: i_and(readM(readW())); break;
 	case 0x30: i_brc(getFlag(Sign)); break;
+	case 0x31: i_and(readM(readBWY())); break;
+	case 0x32: i_and(readM(readBW())); break;
+	case 0x33: i_and(readM(readBSWY())); break;
+	case 0x35: i_and(readM(readBX())); break;
+	case 0x37: i_and(readM(readBRWY())); break;
 	case 0x38: setFlag(Carry); break;
+	case 0x39: i_and(readM(readWY())); break;
 	case 0x3a:
 		regs.A = (regs.A - 1) & (getFlag(FlagM) ? 255 : 65535);
 		updateNZ(regs.A); break;
+	case 0x3d: i_and(readM(readWX())); break;
 	case 0x41: i_eor(readM(readBXW())); break;
 	case 0x42:
 		if (getFlag(FlagM)) {

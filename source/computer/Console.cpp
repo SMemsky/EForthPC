@@ -47,10 +47,6 @@ void Console::draw(sf::RenderWindow & window, unsigned long ticks)
 					if (ticks >> 2 & 0x1) {
 						symbol ^= 128;
 					}
-					if (ticks >> 6 & 0x1) {
-						pushKey('K');
-						pushKey('E');
-					}
 				}
 			}
 
