@@ -940,14 +940,24 @@ void Processor::processInstruction()
 			regs.X &= 0xff;
 		}
 		updateNZX(regs.X); break;
+	case 0xc1: i_cmp(regs.A, readM(readBXW())); break;
 	case 0xc2: resetFlags(readByte()); break;
 	case 0xc3: i_cmp(regs.A, readM(readBS())); break;
+	case 0xc5: i_cmp(regs.A, readM(readByte())); break;
+	case 0xc7: i_cmp(regs.A, readM(readBR())); break;
+	case 0xc9: i_cmp(regs.A, readM()); break;
 	case 0xcb:
 		waiTimeout = true; break;
 	case 0xcd: i_cmp(regs.A, readM(readW())); break;
 	case 0xcf:
 		regs.D = popM(); break;
 	case 0xd0: i_brc(!getFlag(Zero)); break;
+	case 0xd1: i_cmp(regs.A, readM(readBWY())); break;
+	case 0xd2: i_cmp(regs.A, readM(readBW())); break;
+	case 0xd3: i_cmp(regs.A, readM(readBSWY())); break;
+	case 0xd5: i_cmp(regs.A, readM(readBX())); break;
+	case 0xd7: i_cmp(regs.A, readM(readBRWY())); break;
+	case 0xd9: i_cmp(regs.A, readM(readWY())); break;
 	case 0xda: pushX(regs.X); break;
 	case 0xdc:
 		regs.X = regs.I;
@@ -955,6 +965,7 @@ void Processor::processInstruction()
 			regs.X &= 0xff;
 		}
 		updateNZX(regs.X); break;
+	case 0xdd: i_cmp(regs.A, readM(readWX())); break;
 	case 0xdf: pushM(regs.D); break;
 	case 0xe2: setFlags(readByte()); break;
 	case 0xe3: i_sbc(readM(readBS())); break;
