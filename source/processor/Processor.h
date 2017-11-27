@@ -94,6 +94,7 @@ private:
 	void i_adc(uint16_t value);
 	void i_sbc(uint16_t value);
 	void i_div(uint16_t value);
+	void i_asl(uint16_t value);
 	void i_brc(bool condition);
 	void i_trb(uint16_t value);
 	void i_tsb(uint16_t value);
