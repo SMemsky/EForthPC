@@ -92,9 +92,12 @@ private:
 	uint16_t popXr();
 
 	void i_adc(uint16_t value);
+	void i_sbc(uint16_t value);
+	void i_div(uint16_t value);
 	void i_brc(bool condition);
 	void i_cmp(uint16_t x, uint16_t y);
 	void i_inc(uint16_t address);
+	void i_eor(uint16_t value);
 	void i_or(uint16_t value);
 
 	void processMMU(uint8_t opcode);

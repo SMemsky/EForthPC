@@ -83,7 +83,7 @@ void Console::debugPrint() const
 {
 	for (unsigned y = 0; y < screenHeight; ++y) {
 		for (unsigned x = 0; x < screenWidth; ++x) {
-			uint8_t symbol = screen[y + screenWidth + x];
+			uint8_t symbol = screen[y * screenWidth + x];
 			std::cout << static_cast<char>(symbol);
 		}
 		std::cout << std::endl;

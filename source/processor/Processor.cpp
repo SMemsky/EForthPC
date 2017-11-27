@@ -1,7 +1,9 @@
 #include "Processor.h"
 
 #include <cassert>
+#include <chrono>
 #include <iostream>
+#include <thread>
 
 #include "common/FileUtil.h"
 
@@ -96,6 +98,7 @@ void Processor::runTick()
 		&& !rbTimeout)
 	{
 		processInstruction();
+		// std::this_thread::sleep_for(std::chrono::microseconds(100));
 	}
 }
 
@@ -379,7 +382,7 @@ uint16_t Processor::readWW()
 
 uint16_t Processor::readBXW()
 {
-	return readW(readBX());
+	return readW((readByte() + regs.X) & 0xff);
 }
 
 uint16_t Processor::readBWY()
@@ -564,14 +567,40 @@ void Processor::i_adc(uint16_t value)
 			assert(false && "Not implemented");
 		}
 	} else {
-		uint16_t v = regs.A + value + (getFlag(Carry) ? 1 : 0);
-		setFlag(Carry, v > 255);
-		setFlag(Overflow, (v ^ regs.A) & (v ^ value) & 0x80);
+		uint32_t v = +regs.A + value + (getFlag(Carry) ? 1 : 0);
+		setFlag(Carry, v > 65535);
+		setFlag(Overflow, (v ^ regs.A) & (v ^ value) & 0x8000);
 
-		regs.A = v & 0xff;
+		regs.A = v & 0xffff;
 	}
 
 	updateNZ();
+}
+
+void Processor::i_sbc(uint16_t value)
+{
+	if (getFlag(FlagM)) {
+		if (getFlag(Decimal)) {
+			// TODO
+			assert(false && "Not implemented");
+		} else {
+			// TODO
+			assert(false && "Not implemented");
+		}
+	} else {
+		uint32_t v = +regs.A - value + (getFlag(Carry) ? 1 : 1) - 1;
+		setFlag(Carry, (v & 0x10000) == 0);
+		setFlag(Overflow, (v ^ regs.A) & (v ^ -value) & 0x8000);
+
+		regs.A = v & 0xffff;
+	}
+
+	updateNZ();
+}
+
+void Processor::i_div(uint16_t)
+{
+	assert(false && "Not implemented");
 }
 
 void Processor::i_brc(bool condition)
@@ -613,6 +642,12 @@ void Processor::i_inc(uint16_t address)
 	i = (i + 1) & (getFlag(FlagM) ? 255 : 65535);
 	writeM(address, i);
 	updateNZ(i);
+}
+
+void Processor::i_eor(uint16_t value)
+{
+	regs.A ^= value;
+	updateNZ();
 }
 
 void Processor::i_or(uint16_t value)
@@ -673,7 +708,7 @@ void Processor::processMMU(uint8_t opcode)
 void Processor::processInstruction()
 {
 	uint8_t opcode = readMemory(regs.PC++);
-	// std::cout << std::hex << "Got opcode: " << +opcode << std::dec << " (" << +opcode << ")" << std::endl;
+	std::cout << std::hex << (regs.PC - 1) << ": Got opcode: " << +opcode << std::dec << " (" << +opcode << ")" << std::endl;
 
 	switch (opcode) {
 	case 0x01:
@@ -690,7 +725,7 @@ void Processor::processInstruction()
 	case 0x18:
 		clearFlag(Carry); break;
 	case 0x1a:
-		regs.X = (regs.X + 1) & (getFlag(FlagM) ? 255 : 65535);
+		regs.A = (regs.A + 1) & (getFlag(FlagM) ? 255 : 65535);
 		updateNZ(regs.A); break;
 	case 0x22:
 		push2r(regs.I);
@@ -703,6 +738,10 @@ void Processor::processInstruction()
 		i_brc(getFlag(Sign)); break;
 	case 0x38:
 		setFlag(Carry); break;
+	case 0x3a:
+		regs.A = (regs.A - 1) & (getFlag(FlagM) ? 255 : 65535);
+		updateNZ(regs.A); break;
+	case 0x41: i_eor(readM(readBXW())); break;
 	case 0x42:
 		if (getFlag(FlagM)) {
 			regs.A = readMemory(regs.I++);
@@ -711,15 +750,28 @@ void Processor::processInstruction()
 			regs.I += 2;
 		}
 		break;
+	case 0x43: i_eor(readM(readBS())); break;
+	case 0x45: i_eor(readM(readByte())); break;
+	case 0x47: i_eor(readM(readBR())); break;
 	case 0x48:
 		pushM(regs.A); break;
+	case 0x49: i_eor(readM()); break;
 	case 0x4b:
 		pushMr(regs.A); break;
 	case 0x4c:
-		regs.PC = readW(); std::cout << "GOTO " << regs.PC << std::endl; break;
+		regs.PC = readW(); break;
+	case 0x4d: i_eor(readM(readW())); break;
+	case 0x51: i_eor(readM(readBWY())); break;
+	case 0x52: i_eor(readM(readBW())); break;
+	case 0x53: i_eor(readM(readBSWY())); break;
+	case 0x55: i_eor(readM(readBX())); break;
+	case 0x57: i_eor(readM(readBRWY())); break;
+	case 0x59: i_eor(readM(readWY())); break;
 	case 0x5c:
 		regs.I = regs.X;
 		updateNZX(regs.X); break;
+	case 0x5d: i_eor(readM(readWX())); break;
+	case 0x5f: i_div(readM(readBX())); break;
 	case 0x61: i_adc(readM(readBXW())); break;
 	case 0x63: i_adc(readM(readBS())); break;
 	case 0x64:
@@ -729,6 +781,7 @@ void Processor::processInstruction()
 	case 0x68:
 		regs.A = popM();
 		updateNZ(); break;
+	case 0x69: i_adc(readM()); break;
 	case 0x6b:
 		regs.A = popMr();
 		updateNZ(regs.A); break;
@@ -787,6 +840,12 @@ void Processor::processInstruction()
 	case 0xb5:
 		regs.A = readM(readBX());
 		updateNZ(); break;
+	case 0xba:
+		regs.X = regs.SP;
+		if (getFlag(FlagX)) {
+			regs.X &= 0xff;
+		}
+		updateNZX(regs.X); break;
 	case 0xc2:
 		resetFlags(readByte()); break;
 	case 0xc3:
@@ -796,6 +855,8 @@ void Processor::processInstruction()
 		waiTimeout = true; break;
 	case 0xcd:
 		i_cmp(regs.A, readM(readW())); break;
+	case 0xcf:
+		regs.D = popM(); break;
 	case 0xd0:
 		i_brc(!getFlag(Zero)); break;
 	case 0xda:
@@ -808,6 +869,7 @@ void Processor::processInstruction()
 		updateNZX(regs.X); break;
 	case 0xe2:
 		setFlags(readByte()); break;
+	case 0xe3: i_sbc(readM(readBS())); break;
 	case 0xe6:
 		i_inc(readByte()); break;
 	case 0xef:
