@@ -14,7 +14,8 @@ public:
 	{}
 
 	std::string const & getName() const { return name; };
-	std::vector<uint8_t> getImage() const { return image; };
+	std::vector<uint8_t> const & getImage() const { return image; };
+	std::vector<uint8_t> & getImage() { return image; };
 
 	void setName(std::string name) { this->name = std::move(name); };
 	void setImage(std::vector<uint8_t> image) { this->image = std::move(image); };

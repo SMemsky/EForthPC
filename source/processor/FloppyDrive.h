@@ -20,6 +20,10 @@ public:
 	void write(uint8_t address, uint8_t value) override;
 private:
 	void readDiskNameCommand();
+	void writeDiskNameCommand();
+	void readDiskSerialCommand();
+	void readDiskSectorCommand();
+	void writeDiskSectorCommand();
 	void executeCommand();
 
 	std::array<uint8_t, 128> dataBuffer;

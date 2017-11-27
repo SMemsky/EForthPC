@@ -10,8 +10,8 @@ unsigned const Processor::bootImageOffset = 1024;
 unsigned const Processor::bootImageSize = 256;
 unsigned const Processor::cyclesPerTick = 1000;
 
-Processor::Processor(unsigned memoryBanks) :
-	RedbusConnectable(0),
+Processor::Processor(unsigned memoryBanks, uint8_t address) :
+	RedbusConnectable(address),
 	memory(),
 	memoryBanks(memoryBanks),
 	regs{0, 0, 0, 0, 0, 0, 0, 0, 0},

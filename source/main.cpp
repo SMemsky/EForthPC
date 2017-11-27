@@ -26,17 +26,9 @@ int main(int argc, char * argv[])
 	FloppyDrive drive(2);
 	drive.setDisk(disk);
 
-	drive.write(0x82, 0x1);
-
-	std::cout << +drive.read(0x82) << std::endl;
-	for (unsigned i = 0; i < 128; ++i) {
-		std::cout << +drive.read(i) << " ";
-	}
-	std::cout << std::endl;
-
-	// Processor processor(8);
-	// processor.warmBoot();
-	// processor.runTick();
+	Processor processor(8, 0);
+	processor.warmBoot();
+	processor.runTick();
 
 	return 0;
 }

@@ -75,6 +75,78 @@ void FloppyDrive::readDiskNameCommand()
 	regs.command = 0;
 }
 
+void FloppyDrive::writeDiskNameCommand()
+{
+	std::string diskName = "";
+	diskName.reserve(dataBuffer.size() - 1);
+
+	for (unsigned i = 0; i < dataBuffer.size(); ++i) {
+		if (dataBuffer[i] == 0) {
+			break;
+		}
+
+		diskName += static_cast<char>(dataBuffer[i]);
+	}
+
+	disk.setName(diskName);
+
+	regs.command = 0;
+}
+
+void FloppyDrive::readDiskSerialCommand()
+{
+	dataBuffer.fill(0);
+
+	// For now...
+	std::string const diskSerial = "deadbeef";
+	std::copy(diskSerial.begin(), diskSerial.end(), dataBuffer.begin());
+
+	regs.command = 0;
+}
+
+void FloppyDrive::readDiskSectorCommand()
+{
+	if (regs.sector > 2048) {
+		regs.command = uint8_t(-1);
+		return;
+	}
+
+	unsigned const sectorStart = regs.sector * 128;
+	auto const & image = disk.getImage();
+
+	if (image.size() < sectorStart + 128) {
+		regs.command = uint8_t(-1);
+		return;
+	}
+
+	for (unsigned i = 0; i < dataBuffer.size(); ++i) {
+		dataBuffer[i] = image[sectorStart + i];
+	}
+
+	regs.command = 0;
+}
+
+void FloppyDrive::writeDiskSectorCommand()
+{
+	if (regs.sector > 2048) {
+		regs.command = uint8_t(-1);
+		return;
+	}
+
+	unsigned const sectorStart = regs.sector * 128;
+	auto & image = disk.getImage();
+
+	if (image.size() < sectorStart + 128) {
+		image.resize(sectorStart + 128);
+	}
+
+	for (unsigned i = 0; i < dataBuffer.size(); ++i) {
+		image[sectorStart + i] = dataBuffer[i];
+	}
+
+	regs.command = 0;
+}
+
 void FloppyDrive::executeCommand()
 {
 	if (ejected) {
@@ -88,9 +160,13 @@ void FloppyDrive::executeCommand()
 	case 1:
 		readDiskNameCommand(); break;
 	case 2:
+		writeDiskNameCommand(); break;
 	case 3:
+		readDiskSerialCommand(); break;
 	case 4:
+		readDiskSectorCommand(); break;
 	case 5:
+		writeDiskSectorCommand(); break;
 	default:
 		regs.command = uint8_t(-1);
 	}

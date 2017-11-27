@@ -8,7 +8,7 @@
 class Processor : public RedbusConnectable
 {
 public:
-	Processor(unsigned memoryBanks = 1);
+	Processor(unsigned memoryBanks, uint8_t address);
 
 	void coldBoot();
 	void warmBoot();
