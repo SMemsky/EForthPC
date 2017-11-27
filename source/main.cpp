@@ -3,11 +3,11 @@
 #include <vector>
 
 #include "common/FileUtil.h"
-#include "processor/Console.h"
-#include "processor/Floppy.h"
-#include "processor/FloppyDrive.h"
-#include "processor/Processor.h"
-#include "processor/RedbusNetwork.h"
+#include "computer/Console.h"
+#include "computer/Floppy.h"
+#include "computer/FloppyDrive.h"
+#include "computer/Processor.h"
+#include "computer/RedbusNetwork.h"
 
 void printUsage(std::string const & program)
 {
