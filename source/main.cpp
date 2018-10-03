@@ -11,63 +11,73 @@
 #include "computer/Processor.h"
 #include "computer/RedbusNetwork.h"
 
-void printUsage(std::string const & program)
-{
-	std::cout << "Usage:\n"
-		<< "    " << program << " <disk-image>" << std::endl;
+namespace {
+
+constexpr unsigned screenScale  = 3;
+constexpr unsigned screenWidth  = 350;
+constexpr unsigned screenHeight = 230;
+
+constexpr bool     useVsync       = false;
+constexpr unsigned framerateLimit = 144;
+
+constexpr uint8_t consoleAddress     = 0x01;
+constexpr uint8_t floppyDriveAddress = 0x02;
+constexpr uint8_t processorAddress   = 0x00;
+
+// Microseconds per time quanta.
+// See computer/Processor.cpp for CPU Clock timings.
+constexpr long usPerTick = 50 * 1000; // 50 ms, 20Hz
+
 }
 
-int main(int argc, char * argv[])
-{
-	std::vector<std::string> const arguments(argv, argv + argc);
-	if (arguments.size() < 2) {
-		printUsage(arguments[0]);
-		std::exit(1);
-	}
+void printUsage(std::string const & program) {
+	std::cout << "Usage:\n     " << program << " <disk-image>" << std::endl;
+}
 
+struct Context {
+public:
 	RedbusNetwork net;
-	Console console(net, 1);
 
-	Floppy bootDisk(arguments[1], loadFile(arguments[1]));
-	FloppyDrive drive(net, 2);
-	drive.setDisk(bootDisk);
+	Console console;
+	FloppyDrive drive;
+	Processor processor;
 
-	Processor processor(net, 8, 0);
-	processor.warmBoot();
+	sf::RenderWindow window;
 
-	static unsigned const scale = 3;
+	Context(uint8_t consoleAdr, uint8_t driveAdr, uint8_t cpuAdr,
+			uint8_t bankCount) :
+		console(net, consoleAdr),
+		drive(net, driveAdr),
+		processor(net, bankCount, cpuAdr),
+		window()
+	{}
+};
 
-	sf::RenderWindow window(sf::VideoMode(scale*350, scale*230, 32), "EForthPC");
-	auto view = window.getView();
-	view.reset(sf::FloatRect(0, 0, 350, 230));
-	window.setView(view);
-
-	// window.setVerticalSyncEnabled(true);
-	window.setFramerateLimit(144);
-
-	unsigned long const usPerTick = 50 * 1000;
+void mainLoop(Context & context) {
 	unsigned long tickTimer = 0;
-	unsigned long ticks = 0;
+	unsigned long ticks     = 0;
 
 	sf::Clock frameTimer;
 	frameTimer.restart();
 
-	while (window.isOpen()) {
+	context.processor.warmBoot();
+
+	while (context.window.isOpen()) {
 		sf::Event event;
-		while (window.pollEvent(event)) {
-			uint8_t code = 0;
+		while (context.window.pollEvent(event)) {
 			switch (event.type) {
 			case sf::Event::Closed:
-				window.close(); break;
-			case sf::Event::TextEntered:
-				code = event.text.unicode;
+				context.window.close(); break;
+			case sf::Event::TextEntered: {
+				uint8_t code = event.text.unicode;
 				if (code == 10) {
 					code = 13;
 				}
 				if (code > 0 && code <= 127) {
-					console.pushKey(code);
+					context.console.pushKey(code);
 				}
 				break;
+			}
 			default:
 				break;
 			}
@@ -80,13 +90,49 @@ int main(int argc, char * argv[])
 			tickTimer -= usPerTick;
 			++ticks;
 
-			processor.runTick();
+			context.processor.runTick();
 		}
 
-		window.clear();
-		console.draw(window, ticks);
-		window.display();
+		context.window.clear();
+		context.console.draw(context.window, ticks);
+		context.window.display();
 	}
+}
+
+int main(int argc, char * argv[]) {
+	std::vector<std::string> const arguments(argv, argv + argc);
+	if (arguments.size() < 2) {
+		printUsage(arguments[0]);
+		std::exit(1);
+	}
+
+	// Configure RedBus network
+	Context context(consoleAddress, floppyDriveAddress, processorAddress, 8);
+
+	// Load boot image into floppy drive
+	Floppy bootDisk(arguments[1], loadFile(arguments[1]));
+	context.drive.setDisk(bootDisk);
+
+	// Warm boot the 65EL02
+	// context.processor.warmBoot();
+
+	// Create main window
+	context.window.create(
+		sf::VideoMode(screenWidth*screenScale, screenHeight*screenScale, 32),
+		"EForthPC");
+
+	// Make sure rendering is done in a 350x230 point space
+	auto view = context.window.getView();
+	view.reset(sf::FloatRect(0, 0, screenWidth, screenHeight));
+	context.window.setView(view);
+
+	if (useVsync) {
+		context.window.setVerticalSyncEnabled(true);
+	} else {
+		context.window.setFramerateLimit(framerateLimit);
+	}
+
+	mainLoop(context);
 
 	return 0;
 }
